@@ -1,0 +1,91 @@
+<#
+.SYNOPSIS
+    Script para configurar automáticamente un entorno de desarrollo en PowerShell.
+    Instala herramientas, configura oh-my-posh, fastfetch y Windows Terminal.
+#>
+
+# --- INICIO: CONFIGURACIÓN DEL SCRIPT ---
+Clear-Host
+Write-Host "=====================================================" -ForegroundColor Yellow
+Write-Host "    INICIANDO CONFIGURACIÓN AUTOMÁTICA DEL ENTORNO    " -ForegroundColor Yellow
+Write-Host "=====================================================" -ForegroundColor Yellow
+Write-Host
+
+# URL base de tu repositorio de GitHub (¡CÁMBIALA POR LA TUYA!)
+$repoUrl = "https://github.com/BrandonSepulveda/mypowershellconfig/tree/main/config-files"
+
+# --- PASO 1: Establecer política de ejecución y verificar Winget ---
+Write-Host "[Paso 1/5] Preparando el sistema..." -ForegroundColor Cyan
+Set-ExecutionPolicy Bypass -Scope Process -Force
+try {
+    Get-Command winget | Out-Null
+    Write-Host "  -> Winget encontrado." -ForegroundColor Green
+} catch {
+    Write-Host "  -> Winget no encontrado. Por favor, instálalo desde la Microsoft Store." -ForegroundColor Red
+    exit
+}
+
+# --- PASO 2: Instalar aplicaciones con Winget ---
+Write-Host "[Paso 2/5] Instalando herramientas necesarias..." -ForegroundColor Cyan
+$packages = @(
+    @{ Name = "Oh My Posh"; Id = "JanDeDobbeleer.OhMyPosh" },
+    @{ Name = "Fastfetch"; Id = "fastfetch-cli.fastfetch" },
+    @{ Name = "JetBrainsMono Nerd Font"; Id = "JetBrains.JetBrainsMono.NerdFont" }
+)
+
+foreach ($pkg in $packages) {
+    Write-Host "  -> Instalando $($pkg.Name)..."
+    winget install --id $pkg.Id --source winget --accept-package-agreements --accept-source-agreements
+}
+
+# --- PASO 3: Configurar el perfil de PowerShell 7 ---
+Write-Host "[Paso 3/5] Configurando el perfil de PowerShell 7..." -ForegroundColor Cyan
+$profilePath = $PROFILE
+$profileUrl = "$repoUrl/profile.ps1"
+
+# Hacer una copia de seguridad del perfil existente
+if (Test-Path $profilePath) {
+    Write-Host "  -> Perfil existente encontrado. Creando copia de seguridad en $profilePath.bak" -ForegroundColor Yellow
+    Move-Item -Path $profilePath -Destination "$profilePath.bak" -Force
+}
+
+# Descargar y colocar el nuevo perfil
+Write-Host "  -> Descargando perfil desde GitHub..."
+Invoke-WebRequest -Uri $profileUrl -OutFile $profilePath
+Write-Host "  -> Perfil de PowerShell 7 configurado." -ForegroundColor Green
+
+# --- PASO 4: Configurar Fastfetch ---
+Write-Host "[Paso 4/5] Configurando Fastfetch..." -ForegroundColor Cyan
+$configDir = Join-Path -Path $HOME -ChildPath ".config"
+$fastfetchDir = Join-Path -Path $configDir -ChildPath "fastfetch"
+
+# Crear carpetas si no existen
+New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+New-Item -Path $fastfetchDir -ItemType Directory -Force | Out-Null
+
+Write-Host "  -> Descargando archivos de configuración para Fastfetch..."
+Invoke-WebRequest -Uri "$repoUrl/fastfetch/ascii.txt" -OutFile (Join-Path $fastfetchDir "ascii.txt")
+Invoke-WebRequest -Uri "$repoUrl/fastfetch/config.jsonc" -OutFile (Join-Path $fastfetchDir "config.jsonc")
+Write-Host "  -> Fastfetch configurado." -ForegroundColor Green
+
+# --- PASO 5: Configurar Windows Terminal ---
+Write-Host "[Paso 5/5] Configurando Windows Terminal..." -ForegroundColor Cyan
+$wtSettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
+$wtSettingsUrl = "$repoUrl/settings.json"
+
+# Hacer copia de seguridad de la configuración existente
+if (Test-Path $wtSettingsPath) {
+    Write-Host "  -> Configuración de Terminal encontrada. Creando copia de seguridad." -ForegroundColor Yellow
+    Move-Item -Path $wtSettingsPath -Destination "$wtSettingsPath.bak" -Force
+}
+
+Write-Host "  -> Descargando configuración de Windows Terminal desde GitHub..."
+Invoke-WebRequest -Uri $wtSettingsUrl -OutFile $wtSettingsPath
+Write-Host "  -> Windows Terminal configurado." -ForegroundColor Green
+
+# --- FINALIZACIÓN ---
+Write-Host
+Write-Host "=====================================================" -ForegroundColor Green
+Write-Host "          ¡CONFIGURACIÓN COMPLETADA CON ÉXITO!         " -ForegroundColor Green
+Write-Host "=====================================================" -ForegroundColor Green
+Write-Host "Por favor, CIERRA y VUELVE A ABRIR la terminal para ver todos los cambios." -ForegroundColor White
