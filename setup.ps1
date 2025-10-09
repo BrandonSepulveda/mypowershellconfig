@@ -100,3 +100,4 @@ Write-Host "          ¡CONFIGURACIÓN COMPLETADA CON ÉXITO!         " -Foregro
 Write-Host "=====================================================" -ForegroundColor Green
 Write-Host "Por favor, CIERRA y VUELVE A ABRIR la terminal para ver todos los cambios." -ForegroundColor White
 
+
