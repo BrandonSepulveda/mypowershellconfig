@@ -41,27 +41,29 @@ foreach ($pkg in $packages) {
 
 # 2b: Instalar JetBrains Mono Nerd Font manualmente
 Write-Host "  -> Instalando JetBrainsMono Nerd Font manualmente..."
-$fontZipUrl = "https://download.jetbrains.com/fonts/JetBrainsMono-2.304.zip"
-$tempDir = Join-Path -Path $env:TEMP -ChildPath "JetBrainsMonoFont"
-$fontZipPath = Join-Path -Path $tempDir -ChildPath "JetBrainsMono.zip"
+# ¡¡ESTA ES LA URL CORREGIDA A LA VERSIÓN NERD FONT!!
+$fontZipUrl = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/JetBrainsMono.zip"
+$tempDir = Join-Path -Path $env:TEMP -ChildPath "JetBrainsMonoNerdFont"
+$fontZipPath = Join-Path -Path $tempDir -ChildPath "JetBrainsMonoNerd.zip"
 
 try {
     if (-not (Test-Path -Path $tempDir)) { New-Item -Path $tempDir -ItemType Directory | Out-Null }
     
-    Write-Host "    -> Descargando el archivo de fuentes..."
+    Write-Host "    -> Descargando el archivo de fuentes (Nerd Font)..."
     Invoke-WebRequest -Uri $fontZipUrl -OutFile $fontZipPath
     
     Write-Host "    -> Extrayendo fuentes..."
     Expand-Archive -Path $fontZipPath -DestinationPath $tempDir -Force
     
-    $fontFiles = Get-ChildItem -Path (Join-Path $tempDir "fonts\ttf") -Filter "*.ttf" -Recurse
+    # Las fuentes .ttf pueden no estar en una subcarpeta en este ZIP
+    $fontFiles = Get-ChildItem -Path $tempDir -Filter "*.ttf" -Recurse
     if ($fontFiles) {
         Write-Host "    -> Instalando $($fontFiles.Count) archivos de fuente..."
         $fontsDir = "$env:SystemRoot\Fonts"
         foreach ($fontFile in $fontFiles) {
             Copy-Item -Path $fontFile.FullName -Destination $fontsDir -Force
         }
-        Write-Host "  -> Fuentes de JetBrains Mono instaladas correctamente." -ForegroundColor Green
+        Write-Host "  -> Fuentes de JetBrainsMono Nerd Font instaladas correctamente." -ForegroundColor Green
     } else {
         Write-Host "  -> No se encontraron archivos .ttf en el ZIP descargado." -ForegroundColor Red
     }
@@ -76,6 +78,7 @@ try {
 
 # --- PASO 3: Configurar el perfil de PowerShell 7 ---
 Write-Host "[Paso 3/4] Configurando el perfil de PowerShell 7..." -ForegroundColor Cyan
+# (Se ha eliminado la descarga del tema toolbox.omp.json según tu petición)
 $profilePath = $PROFILE
 $profileUrl = "$repoUrl/profile.ps1"
 if (Test-Path $profilePath) {
