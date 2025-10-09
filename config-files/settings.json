@@ -70,7 +70,7 @@
                 "builtinGlyphs": true,
                 "cellHeight": "1.2",
                 "colorGlyphs": true,
-                "face": "JetBrains Mono",
+                "face": "JetBrainsMono Nerd Font",
                 "size": 10,
                 "weight": "extra-black"
             },
