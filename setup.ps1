@@ -15,7 +15,7 @@ Write-Host
 $repoUrl = "https://raw.githubusercontent.com/BrandonSepulveda/mypowershellconfig/main/config-files"
 
 # --- PASO 1: Establecer política de ejecución y verificar Winget ---
-Write-Host "[Paso 1/5] Preparando el sistema..." -ForegroundColor Cyan
+Write-Host "[Paso 1/4] Preparando el sistema..." -ForegroundColor Cyan
 Set-ExecutionPolicy Bypass -Scope Process -Force
 try {
     Get-Command winget | Out-Null
@@ -26,7 +26,7 @@ try {
 }
 
 # --- PASO 2: Instalar aplicaciones y fuentes ---
-Write-Host "[Paso 2/5] Instalando herramientas y fuentes..." -ForegroundColor Cyan
+Write-Host "[Paso 2/4] Instalando herramientas y fuentes..." -ForegroundColor Cyan
 # 2a: Instalar Oh My Posh y Fastfetch con Winget
 Write-Host "  -> Actualizando fuentes de Winget..."
 winget source update
@@ -74,12 +74,8 @@ try {
     }
 }
 
-
 # --- PASO 3: Configurar el perfil de PowerShell 7 ---
-Write-Host "[Paso 3/5] Configurando el perfil de PowerShell 7..." -ForegroundColor Cyan
-$themeUrl = "$repoUrl/toolbox-theme.omp.json"
-$themePath = Join-Path -Path $HOME -ChildPath "toolbox-theme.omp.json"
-Invoke-WebRequest -Uri $themeUrl -OutFile $themePath
+Write-Host "[Paso 3/4] Configurando el perfil de PowerShell 7..." -ForegroundColor Cyan
 $profilePath = $PROFILE
 $profileUrl = "$repoUrl/profile.ps1"
 if (Test-Path $profilePath) {
@@ -88,8 +84,9 @@ if (Test-Path $profilePath) {
 Invoke-WebRequest -Uri $profileUrl -OutFile $profilePath
 Write-Host "  -> Perfil de PowerShell 7 configurado." -ForegroundColor Green
 
-# --- PASO 4: Configurar Fastfetch ---
-Write-Host "[Paso 4/5] Configurando Fastfetch..." -ForegroundColor Cyan
+# --- PASO 4: Configurar Fastfetch y Windows Terminal ---
+Write-Host "[Paso 4/4] Configurando Fastfetch y Windows Terminal..." -ForegroundColor Cyan
+# Configurar Fastfetch
 $configDir = Join-Path -Path $HOME -ChildPath ".config"
 $fastfetchDir = Join-Path -Path $configDir -ChildPath "fastfetch"
 New-Item -Path $configDir -ItemType Directory -Force | Out-Null
@@ -99,8 +96,7 @@ Invoke-WebRequest -Uri "$repoUrl/fastfetch/ascii.txt" -OutFile (Join-Path $fastf
 Invoke-WebRequest -Uri "$repoUrl/fastfetch/config.jsonc" -OutFile (Join-Path $fastfetchDir "config.jsonc")
 Write-Host "  -> Fastfetch configurado." -ForegroundColor Green
 
-# --- PASO 5: Configurar Windows Terminal ---
-Write-Host "[Paso 5/5] Configurando Windows Terminal..." -ForegroundColor Cyan
+# Configurar Windows Terminal
 $wtSettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
 $wtSettingsUrl = "$repoUrl/settings.json"
 if (Test-Path $wtSettingsPath) {
@@ -115,3 +111,4 @@ Write-Host "=====================================================" -ForegroundCo
 Write-Host "          ¡CONFIGURACIÓN COMPLETADA CON ÉXITO!         " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Green
 Write-Host "Por favor, CIERRA y VUELVE A ABRIR la terminal para ver todos los cambios." -ForegroundColor White
+Write-Host "Si las fuentes no se aplican, REINICIA TU COMPUTADORA." -ForegroundColor Yellow
