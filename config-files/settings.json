@@ -62,7 +62,7 @@
     {
         "defaults": 
         {
-            "colorScheme": "Catppuccin Mocha",
+            "colorScheme": "ToolboxBS Style",
             "cursorShape": "filledBox",
             "experimental.retroTerminalEffect": false,
             "font": 
@@ -110,6 +110,29 @@
     "schemes": 
     [
         {
+            "name": "ToolboxBS Style",
+            "background": "#000000",
+            "foreground": "#FFFFFF",
+            "cursorColor": "#FFFFFF",
+            "selectionBackground": "#4D94FF",
+            "black": "#1A1A1A",
+            "brightBlack": "#808080",
+            "red": "#FF4D4D",
+            "brightRed": "#FF6666",
+            "green": "#4DFF4D",
+            "brightGreen": "#66FF66",
+            "yellow": "#FFFF4D",
+            "brightYellow": "#FFFF66",
+            "blue": "#4D94FF",
+            "brightBlue": "#66A3FF",
+            "purple": "#B266FF",
+            "brightPurple": "#C285FF",
+            "cyan": "#66FFFF",
+            "brightCyan": "#85FFFF",
+            "white": "#E6E6E6",
+            "brightWhite": "#FFFFFF"
+        },
+        {
             "background": "#1E1E2E",
             "black": "#45475A",
             "blue": "#89B4FA",
@@ -131,52 +154,6 @@
             "selectionBackground": "#585B70",
             "white": "#BAC2DE",
             "yellow": "#F9E2AF"
-        },
-        {
-            "background": "#000000",
-            "black": "#0C0C0C",
-            "blue": "#0037DA",
-            "brightBlack": "#767676",
-            "brightBlue": "#3B78FF",
-            "brightCyan": "#61D6D6",
-            "brightGreen": "#16C60C",
-            "brightPurple": "#B4009E",
-            "brightRed": "#E74856",
-            "brightWhite": "#F2F2F2",
-            "brightYellow": "#F9F1A5",
-            "cursorColor": "#FFFFFF",
-            "cyan": "#3A96DD",
-            "foreground": "#FFFFFF",
-            "green": "#13A10E",
-            "name": "Color Scheme 15",
-            "purple": "#881798",
-            "red": "#C50F1F",
-            "selectionBackground": "#FFFFFF",
-            "white": "#CCCCCC",
-            "yellow": "#C19C00"
-        },
-        {
-            "background": "#282A36",
-            "black": "#21222C",
-            "blue": "#BD93F9",
-            "brightBlack": "#6272A4",
-            "brightBlue": "#D6ACFF",
-            "brightCyan": "#A4FFFF",
-            "brightGreen": "#69FF94",
-            "brightPurple": "#FF92DF",
-            "brightRed": "#FF6E6E",
-            "brightWhite": "#FFFFFF",
-            "brightYellow": "#FFFFA5",
-            "cursorColor": "#F8F8F2",
-            "cyan": "#8BE9FD",
-            "foreground": "#F8F8F2",
-            "green": "#50FA7B",
-            "name": "Dracula",
-            "purple": "#FF79C6",
-            "red": "#FF5555",
-            "selectionBackground": "#44475A",
-            "white": "#F8F8F2",
-            "yellow": "#F1FA8C"
         }
     ],
     "tabWidthMode": "titleLength",
