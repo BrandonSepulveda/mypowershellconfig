@@ -11,8 +11,8 @@ Write-Host "    INICIANDO CONFIGURACIÓN AUTOMÁTICA DEL ENTORNO    " -Foregroun
 Write-Host "=====================================================" -ForegroundColor Yellow
 Write-Host
 
-# URL base de tu repositorio de GitHub (¡CÁMBIALA POR LA TUYA!)
-$repoUrl = "https://github.com/BrandonSepulveda/mypowershellconfig/tree/main/config-files"
+# URL base de tu repositorio de GitHub (CORREGIDA A LA VERSIÓN RAW)
+$repoUrl = "https://raw.githubusercontent.com/BrandonSepulveda/mypowershellconfig/main/config-files"
 
 # --- PASO 1: Establecer política de ejecución y verificar Winget ---
 Write-Host "[Paso 1/5] Preparando el sistema..." -ForegroundColor Cyan
@@ -27,6 +27,8 @@ try {
 
 # --- PASO 2: Instalar aplicaciones con Winget ---
 Write-Host "[Paso 2/5] Instalando herramientas necesarias..." -ForegroundColor Cyan
+Write-Host "  -> Actualizando fuentes de Winget..."
+winget source update
 $packages = @(
     @{ Name = "Oh My Posh"; Id = "JanDeDobbeleer.OhMyPosh" },
     @{ Name = "Fastfetch"; Id = "fastfetch-cli.fastfetch" },
@@ -40,16 +42,22 @@ foreach ($pkg in $packages) {
 
 # --- PASO 3: Configurar el perfil de PowerShell 7 ---
 Write-Host "[Paso 3/5] Configurando el perfil de PowerShell 7..." -ForegroundColor Cyan
+
+# Descargar el tema de Oh My Posh, que es una dependencia del perfil
+Write-Host "  -> Descargando tema de Oh My Posh..."
+$themeUrl = "$repoUrl/toolbox-theme.omp.json" # Asumiendo que el tema está en tu repo
+$themePath = Join-Path -Path $HOME -ChildPath "toolbox-theme.omp.json"
+Invoke-WebRequest -Uri $themeUrl -OutFile $themePath
+
+# Configurar el archivo profile.ps1
 $profilePath = $PROFILE
 $profileUrl = "$repoUrl/profile.ps1"
 
-# Hacer una copia de seguridad del perfil existente
 if (Test-Path $profilePath) {
     Write-Host "  -> Perfil existente encontrado. Creando copia de seguridad en $profilePath.bak" -ForegroundColor Yellow
     Move-Item -Path $profilePath -Destination "$profilePath.bak" -Force
 }
 
-# Descargar y colocar el nuevo perfil
 Write-Host "  -> Descargando perfil desde GitHub..."
 Invoke-WebRequest -Uri $profileUrl -OutFile $profilePath
 Write-Host "  -> Perfil de PowerShell 7 configurado." -ForegroundColor Green
@@ -59,8 +67,9 @@ Write-Host "[Paso 4/5] Configurando Fastfetch..." -ForegroundColor Cyan
 $configDir = Join-Path -Path $HOME -ChildPath ".config"
 $fastfetchDir = Join-Path -Path $configDir -ChildPath "fastfetch"
 
-# Crear carpetas si no existen
 New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+# Ocultar la carpeta .config
+(Get-Item -Path $configDir).Attributes += 'Hidden'
 New-Item -Path $fastfetchDir -ItemType Directory -Force | Out-Null
 
 Write-Host "  -> Descargando archivos de configuración para Fastfetch..."
@@ -73,7 +82,6 @@ Write-Host "[Paso 5/5] Configurando Windows Terminal..." -ForegroundColor Cyan
 $wtSettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
 $wtSettingsUrl = "$repoUrl/settings.json"
 
-# Hacer copia de seguridad de la configuración existente
 if (Test-Path $wtSettingsPath) {
     Write-Host "  -> Configuración de Terminal encontrada. Creando copia de seguridad." -ForegroundColor Yellow
     Move-Item -Path $wtSettingsPath -Destination "$wtSettingsPath.bak" -Force
