@@ -25,10 +25,12 @@ try {
     exit
 }
 
-# --- PASO 2: Instalar aplicaciones con Winget ---
 Write-Host "[Paso 2/5] Instalando herramientas necesarias..." -ForegroundColor Cyan
+
+# Esta línea es clave para evitar que la instalación de fuentes falle
 Write-Host "  -> Actualizando fuentes de Winget..."
 winget source update
+
 $packages = @(
     @{ Name = "Oh My Posh"; Id = "JanDeDobbeleer.OhMyPosh" },
     @{ Name = "Fastfetch"; Id = "fastfetch-cli.fastfetch" },
@@ -97,3 +99,4 @@ Write-Host "=====================================================" -ForegroundCo
 Write-Host "          ¡CONFIGURACIÓN COMPLETADA CON ÉXITO!         " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Green
 Write-Host "Por favor, CIERRA y VUELVE A ABRIR la terminal para ver todos los cambios." -ForegroundColor White
+
