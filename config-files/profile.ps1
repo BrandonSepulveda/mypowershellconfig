@@ -10,8 +10,7 @@ try {
 
 # 1. Inicializa Oh My Posh con tu tema personalizado.
 #    Asegúrate de que el archivo 'toolbox-theme.omp.json' también esté en tu repo.
-oh-my-posh init pwsh --config "$HOME/toolbox-theme.omp.json" | Invoke-Expression
-
+oh-my-posh init pwsh --config "$env:POSH_THEMES_PATH/jandedobbeleer.omp.json" | Invoke-Expression
 # 2. Limpia la pantalla después de cargar el prompt.
 Clear-Host
 
@@ -19,3 +18,4 @@ Clear-Host
 if (Get-Command fastfetch -ErrorAction SilentlyContinue) {
     fastfetch -c "$HOME/.config/fastfetch/config.jsonc"
 }
+
