@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
     Script para configurar automáticamente un entorno de desarrollo en PowerShell.
+    Versión final corregida.
 #>
 
 # --- INICIO: CONFIGURACIÓN DEL SCRIPT ---
@@ -9,8 +10,6 @@ Write-Host "=====================================================" -ForegroundCo
 Write-Host "    INICIANDO CONFIGURACIÓN AUTOMÁTICA DEL ENTORNO    " -ForegroundColor Yellow
 Write-Host "=====================================================" -ForegroundColor Yellow
 Write-Host
-
-# Se recomienda encarecidamente ejecutar este script como Administrador.
 
 $repoUrl = "https://raw.githubusercontent.com/BrandonSepulveda/mypowershellconfig/main/config-files"
 
@@ -36,6 +35,7 @@ foreach ($pkg in $packages) {
     winget install --id $pkg.Id --source winget --accept-package-agreements --accept-source-agreements
 }
 
+# Verificación para no reinstalar fuentes
 Write-Host "  -> Verificando si JetBrainsMono Nerd Font ya está instalada..."
 Add-Type -AssemblyName System.Drawing
 $installedFonts = New-Object System.Drawing.Text.InstalledFontCollection
@@ -49,8 +49,30 @@ foreach ($fontFamily in $installedFonts.Families) {
 
 if (-not $fontAlreadyInstalled) {
     Write-Host "  -> La fuente no está instalada. Descargando e instalando..."
-    # (El resto del código de instalación de fuentes que ya funciona)
-    # ...
+    $fontZipUrl = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/JetBrainsMono.zip"
+    $tempDir = Join-Path -Path $env:TEMP -ChildPath "JetBrainsMonoNerdFont"
+    $fontZipPath = Join-Path -Path $tempDir -ChildPath "JetBrainsMonoNerd.zip"
+    try {
+        if (-not (Test-Path -Path $tempDir)) { New-Item -Path $tempDir -ItemType Directory | Out-Null }
+        Invoke-WebRequest -Uri $fontZipUrl -OutFile $fontZipPath
+        Expand-Archive -Path $fontZipPath -DestinationPath $tempDir -Force
+        $fontFiles = Get-ChildItem -Path $tempDir -Filter "*.ttf" -Recurse
+        if ($fontFiles) {
+            Write-Host "    -> Registrando $($fontFiles.Count) archivos de fuente..."
+            $shell = New-Object -ComObject Shell.Application
+            $fontsFolder = $shell.Namespace(0x14)
+            foreach ($fontFile in $fontFiles) {
+                $fontsFolder.CopyHere($fontFile.FullName, 0x10) 
+            }
+            Write-Host "  -> Fuentes de JetBrainsMono Nerd Font registradas." -ForegroundColor Green
+        } else {
+            Write-Host "  -> No se encontraron archivos .ttf en el ZIP descargado." -ForegroundColor Red
+        }
+    } catch {
+        Write-Host "  -> Ocurrió un error al instalar las fuentes: $($_.Exception.Message)" -ForegroundColor Red
+    } finally {
+        if (Test-Path -Path $tempDir) { Remove-Item -Path $tempDir -Recurse -Force }
+    }
 } else {
     Write-Host "  -> Fuentes JetBrainsMono Nerd Font ya están instaladas. Omitiendo." -ForegroundColor Green
 }
@@ -59,13 +81,12 @@ if (-not $fontAlreadyInstalled) {
 Write-Host "[Paso 3/4] Configurando el perfil de PowerShell 7..." -ForegroundColor Cyan
 $profileUrl = "$repoUrl/profile.ps1"
 
-# --- INICIO DE LA MODIFICACIÓN: ASEGURAR QUE EL DIRECTORIO DEL PERFIL EXISTA ---
+# --- CORRECCIÓN: Asegurar que el directorio del perfil exista ---
 $profileDir = Split-Path -Path $PROFILE -Parent
 if (-not (Test-Path -Path $profileDir)) {
     Write-Host "  -> Creando directorio para el perfil de PowerShell: $profileDir"
     New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
 }
-# --- FIN DE LA MODIFICACIÓN ---
 
 if (Test-Path $PROFILE) { Move-Item -Path $PROFILE -Destination "$PROFILE.bak" -Force }
 Invoke-WebRequest -Uri $profileUrl -OutFile $PROFILE
@@ -93,4 +114,4 @@ Write-Host "=====================================================" -ForegroundCo
 Write-Host "         ¡CONFIGURACIÓN COMPLETADA CON ÉXITO!         " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Green
 Write-Host "Por favor, CIERRA y VUELVE A ABRIR la terminal para ver todos los cambios." -ForegroundColor White
-Write-Host "Para que las fuentes se apliquen correctamente, REINICIA TU COMPUTADORA." -ForegroundColor Yellow
+Write-Host "Para que las fuentes se apliquen correctamente, es posible que necesites REINICIAR TU COMPUTADORA." -ForegroundColor Yellow
