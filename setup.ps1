@@ -201,9 +201,13 @@ $fastfetchDir  = Join-Path -Path $configDir -ChildPath "fastfetch"
 New-Item -Path $configDir -ItemType Directory -Force | Out-Null
 New-Item -Path $fastfetchDir -ItemType Directory -Force | Out-Null
 
-$ffOk1 = Invoke-WebRequestWithRetry -Uri "$repoUrl/fastfetch/ascii.txt" -OutFile (Join-Path $fastfetchDir "ascii.txt")
-$ffOk2 = Invoke-WebRequestWithRetry -Uri "$repoUrl/fastfetch/config.jsonc" -OutFile (Join-Path $fastfetchDir "config.jsonc")
-if ($ffOk1 -and $ffOk2) { Write-Host "  -> Fastfetch configurado." -ForegroundColor Green }
+$ffOk1 = Invoke-WebRequestWithRetry -Uri "$repoUrl/ascii.txt" -OutFile (Join-Path $fastfetchDir "ascii.txt")
+$ffOk2 = Invoke-WebRequestWithRetry -Uri "$repoUrl/config.jsonc" -OutFile (Join-Path $fastfetchDir "config.jsonc")
+if ($ffOk1 -and $ffOk2) {
+    Write-Host "  -> Fastfetch configurado." -ForegroundColor Green
+} else {
+    Write-Host "  -> No se pudo configurar Fastfetch por completo (revisa los errores de descarga arriba)." -ForegroundColor Red
+}
 
 if (-not $SkipTerminalSettings) {
     $wtSettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
