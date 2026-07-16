@@ -118,13 +118,47 @@ if (-not $SkipFonts) {
                 Expand-Archive -Path $fontZipPath -DestinationPath $tempDir -Force
                 $fontFiles = Get-ChildItem -Path $tempDir -Filter "*.ttf" -Recurse
                 if ($fontFiles) {
-                    Write-Host "    -> Registrando $($fontFiles.Count) archivos de fuente..."
-                    $shell = New-Object -ComObject Shell.Application
-                    $fontsFolder = $shell.Namespace(0x14)
-                    foreach ($fontFile in $fontFiles) {
-                        $fontsFolder.CopyHere($fontFile.FullName, 0x10)
+                    Write-Host "    -> Instalando $($fontFiles.Count) archivos de fuente (sin ventanas emergentes)..."
+
+                    # Instalación silenciosa por usuario (sin admin, sin el cuadro de copiado de Shell.Application):
+                    # 1) Copiamos el .ttf directo a la carpeta de fuentes del usuario
+                    # 2) Registramos el nombre real de la fuente (leído del propio archivo) en el registro
+                    # 3) Avisamos a Windows con WM_FONTCHANGE para que las apps abiertas la vean sin reiniciar sesión
+                    $userFontsDir = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
+                    if (-not (Test-Path -Path $userFontsDir)) { New-Item -Path $userFontsDir -ItemType Directory -Force | Out-Null }
+                    $fontsRegPath = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
+
+                    if (-not ([System.Management.Automation.PSTypeName]'Win32Font.NativeMethods').Type) {
+                        Add-Type -Namespace Win32Font -Name NativeMethods -MemberDefinition @"
+[DllImport("user32.dll", CharSet = CharSet.Auto)]
+public static extern int SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+"@
                     }
-                    Write-Host "  -> Fuentes de JetBrainsMono Nerd Font registradas." -ForegroundColor Green
+
+                    $installedCount = 0
+                    foreach ($fontFile in $fontFiles) {
+                        try {
+                            $destPath = Join-Path $userFontsDir $fontFile.Name
+                            Copy-Item -Path $fontFile.FullName -Destination $destPath -Force
+
+                            # Leemos el nombre REAL de la fuente desde el archivo (más confiable que adivinarlo del nombre del archivo)
+                            $privateFonts = New-Object System.Drawing.Text.PrivateFontCollection
+                            $privateFonts.AddFontFile($destPath)
+                            $fontDisplayName = $privateFonts.Families[0].Name
+                            $privateFonts.Dispose()
+
+                            Set-ItemProperty -Path $fontsRegPath -Name "$fontDisplayName (TrueType)" -Value $fontFile.Name -Type String -Force
+                            $installedCount++
+                        } catch {
+                            Write-Host "    -> No se pudo instalar $($fontFile.Name): $($_.Exception.Message)" -ForegroundColor DarkYellow
+                        }
+                    }
+
+                    # Broadcast WM_FONTCHANGE para que Windows Terminal y demás apps abiertas la reconozcan ya mismo
+                    [UIntPtr]$wmResult = [UIntPtr]::Zero
+                    [Win32Font.NativeMethods]::SendMessageTimeout([IntPtr]0xffff, 0x1D, [UIntPtr]::Zero, [IntPtr]::Zero, 2, 1000, [ref]$wmResult) | Out-Null
+
+                    Write-Host "  -> $installedCount fuentes de JetBrainsMono Nerd Font instaladas (sin ventanas emergentes)." -ForegroundColor Green
                 } else {
                     Write-Host "  -> No se encontraron archivos .ttf en el ZIP descargado." -ForegroundColor Red
                 }
