@@ -1,8 +1,21 @@
 <#
 .SYNOPSIS
     Script para configurar automáticamente un entorno de desarrollo en PowerShell.
-    Versión final corregida.
+    Versión 2.0 - Mejorada (TLS, reintentos, backups con timestamp, fuente dinámica, idempotencia).
+.PARAMETER SkipFonts
+    Omite la instalación de la fuente Nerd Font.
+.PARAMETER SkipTerminalSettings
+    Omite la sobreescritura de settings.json de Windows Terminal (recomendado si ya tienes personalizaciones).
+.PARAMETER SkipProfile
+    Omite la actualización del perfil de PowerShell.
 #>
+
+[CmdletBinding()]
+param(
+    [switch]$SkipFonts,
+    [switch]$SkipTerminalSettings,
+    [switch]$SkipProfile
+)
 
 # --- INICIO: CONFIGURACIÓN DEL SCRIPT ---
 Clear-Host
@@ -11,102 +24,165 @@ Write-Host "    INICIANDO CONFIGURACIÓN AUTOMÁTICA DEL ENTORNO    " -Foregroun
 Write-Host "=====================================================" -ForegroundColor Yellow
 Write-Host
 
-$repoUrl = "https://raw.githubusercontent.com/BrandonSepulveda/mypowershellconfig/main/config-files"
+# Forzar TLS 1.2 - crítico en PowerShell 5.1, evita fallos silenciosos de Invoke-WebRequest contra GitHub
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+$repoUrl   = "https://raw.githubusercontent.com/BrandonSepulveda/mypowershellconfig/main/config-files"
+$isAdmin   = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+
+# --- Helper: descarga con reintentos ---
+function Invoke-WebRequestWithRetry {
+    param(
+        [Parameter(Mandatory)][string]$Uri,
+        [Parameter(Mandatory)][string]$OutFile,
+        [int]$MaxRetries = 3,
+        [int]$DelaySeconds = 2
+    )
+    for ($i = 1; $i -le $MaxRetries; $i++) {
+        try {
+            Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -ErrorAction Stop
+            return $true
+        } catch {
+            Write-Host "    -> Intento $i/$MaxRetries falló para $Uri : $($_.Exception.Message)" -ForegroundColor DarkYellow
+            if ($i -lt $MaxRetries) { Start-Sleep -Seconds $DelaySeconds }
+        }
+    }
+    Write-Host "  -> ERROR: No se pudo descargar $Uri tras $MaxRetries intentos." -ForegroundColor Red
+    return $false
+}
+
+# --- Helper: backup con timestamp (nunca sobrescribe backups anteriores) ---
+function Backup-ExistingFile {
+    param([Parameter(Mandatory)][string]$Path)
+    if (Test-Path -Path $Path) {
+        $backupPath = "$Path.bak_$timestamp"
+        Move-Item -Path $Path -Destination $backupPath -Force
+        Write-Host "  -> Backup creado: $backupPath" -ForegroundColor DarkGray
+    }
+}
+
+if (-not $isAdmin) {
+    Write-Host "  -> Aviso: no estás corriendo como Administrador. La instalación de fuentes y algunos paquetes de winget pueden fallar." -ForegroundColor Yellow
+}
 
 # --- PASO 1: Preparando el sistema ---
 Write-Host "[Paso 1/4] Preparando el sistema..." -ForegroundColor Cyan
 Set-ExecutionPolicy Bypass -Scope Process -Force
-try {
-    winget --version | Out-Null
-    Write-Host "  -> Winget encontrado." -ForegroundColor Green
-} catch {
-    Write-Host "  -> Winget no encontrado. Por favor, instálalo desde la Microsoft Store." -ForegroundColor Red; exit
+
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Write-Host "  -> Winget no encontrado. Por favor, instálalo desde la Microsoft Store (App Installer)." -ForegroundColor Red
+    exit 1
 }
+Write-Host "  -> Winget encontrado ($(winget --version))." -ForegroundColor Green
 
 # --- PASO 2: Instalando herramientas y fuentes ---
-Write-Host "[Paso 2/4] Instalando herramientas y fuentes..." -ForegroundColor Cyan
-winget source update
+Write-Host "[Paso 2/4] Instalando herramientas..." -ForegroundColor Cyan
+winget source update | Out-Null
+
 $packages = @(
     @{ Name = "Oh My Posh"; Id = "JanDeDobbeleer.OhMyPosh" },
-    @{ Name = "Fastfetch"; Id = "fastfetch-cli.fastfetch" }
+    @{ Name = "Fastfetch";  Id = "fastfetch-cli.fastfetch" }
 )
-foreach ($pkg in $packages) {
-    Write-Host "  -> Instalando $($pkg.Name)..."
-    winget install --id $pkg.Id --source winget --accept-package-agreements --accept-source-agreements
-}
 
-# Verificación para no reinstalar fuentes
-Write-Host "  -> Verificando si JetBrainsMono Nerd Font ya está instalada..."
-Add-Type -AssemblyName System.Drawing
-$installedFonts = New-Object System.Drawing.Text.InstalledFontCollection
-$fontAlreadyInstalled = $false
-foreach ($fontFamily in $installedFonts.Families) {
-    if ($fontFamily.Name -like "*JetBrainsMono*") {
-        $fontAlreadyInstalled = $true
-        break
+foreach ($pkg in $packages) {
+    $installed = winget list --id $pkg.Id --accept-source-agreements 2>$null | Select-String -Pattern $pkg.Id
+    if ($installed) {
+        Write-Host "  -> $($pkg.Name) ya está instalado. Omitiendo." -ForegroundColor Green
+    } else {
+        Write-Host "  -> Instalando $($pkg.Name)..."
+        winget install --id $pkg.Id --source winget --accept-package-agreements --accept-source-agreements
     }
 }
 
-if (-not $fontAlreadyInstalled) {
-    Write-Host "  -> La fuente no está instalada. Descargando e instalando..."
-    $fontZipUrl = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/JetBrainsMono.zip"
-    $tempDir = Join-Path -Path $env:TEMP -ChildPath "JetBrainsMonoNerdFont"
-    $fontZipPath = Join-Path -Path $tempDir -ChildPath "JetBrainsMonoNerd.zip"
-    try {
-        if (-not (Test-Path -Path $tempDir)) { New-Item -Path $tempDir -ItemType Directory | Out-Null }
-        Invoke-WebRequest -Uri $fontZipUrl -OutFile $fontZipPath
-        Expand-Archive -Path $fontZipPath -DestinationPath $tempDir -Force
-        $fontFiles = Get-ChildItem -Path $tempDir -Filter "*.ttf" -Recurse
-        if ($fontFiles) {
-            Write-Host "    -> Registrando $($fontFiles.Count) archivos de fuente..."
-            $shell = New-Object -ComObject Shell.Application
-            $fontsFolder = $shell.Namespace(0x14)
-            foreach ($fontFile in $fontFiles) {
-                $fontsFolder.CopyHere($fontFile.FullName, 0x10) 
+if (-not $SkipFonts) {
+    Write-Host "  -> Verificando si JetBrainsMono Nerd Font ya está instalada..."
+    Add-Type -AssemblyName System.Drawing
+    $installedFonts = New-Object System.Drawing.Text.InstalledFontCollection
+    $fontAlreadyInstalled = $installedFonts.Families.Name -like "*JetBrainsMono*" | Where-Object { $_ }
+
+    if (-not $fontAlreadyInstalled) {
+        Write-Host "  -> La fuente no está instalada. Buscando la última versión disponible..."
+        $tempDir     = Join-Path -Path $env:TEMP -ChildPath "JetBrainsMonoNerdFont"
+        $fontZipPath = Join-Path -Path $tempDir -ChildPath "JetBrainsMonoNerd.zip"
+        try {
+            if (-not (Test-Path -Path $tempDir)) { New-Item -Path $tempDir -ItemType Directory | Out-Null }
+
+            # Resuelve dinámicamente la última versión del release en vez de una fija (v3.2.1 quedaba obsoleta)
+            $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" -UseBasicParsing
+            $fontZipUrl = ($latestRelease.assets | Where-Object { $_.name -eq "JetBrainsMono.zip" }).browser_download_url
+            if (-not $fontZipUrl) { throw "No se encontró JetBrainsMono.zip en el último release ($($latestRelease.tag_name))." }
+
+            Write-Host "    -> Descargando release $($latestRelease.tag_name)..."
+            if (Invoke-WebRequestWithRetry -Uri $fontZipUrl -OutFile $fontZipPath) {
+                Expand-Archive -Path $fontZipPath -DestinationPath $tempDir -Force
+                $fontFiles = Get-ChildItem -Path $tempDir -Filter "*.ttf" -Recurse
+                if ($fontFiles) {
+                    Write-Host "    -> Registrando $($fontFiles.Count) archivos de fuente..."
+                    $shell = New-Object -ComObject Shell.Application
+                    $fontsFolder = $shell.Namespace(0x14)
+                    foreach ($fontFile in $fontFiles) {
+                        $fontsFolder.CopyHere($fontFile.FullName, 0x10)
+                    }
+                    Write-Host "  -> Fuentes de JetBrainsMono Nerd Font registradas." -ForegroundColor Green
+                } else {
+                    Write-Host "  -> No se encontraron archivos .ttf en el ZIP descargado." -ForegroundColor Red
+                }
             }
-            Write-Host "  -> Fuentes de JetBrainsMono Nerd Font registradas." -ForegroundColor Green
-        } else {
-            Write-Host "  -> No se encontraron archivos .ttf en el ZIP descargado." -ForegroundColor Red
+        } catch {
+            Write-Host "  -> Ocurrió un error al instalar las fuentes: $($_.Exception.Message)" -ForegroundColor Red
+        } finally {
+            if (Test-Path -Path $tempDir) { Remove-Item -Path $tempDir -Recurse -Force }
         }
-    } catch {
-        Write-Host "  -> Ocurrió un error al instalar las fuentes: $($_.Exception.Message)" -ForegroundColor Red
-    } finally {
-        if (Test-Path -Path $tempDir) { Remove-Item -Path $tempDir -Recurse -Force }
+    } else {
+        Write-Host "  -> Fuentes JetBrainsMono Nerd Font ya están instaladas. Omitiendo." -ForegroundColor Green
     }
 } else {
-    Write-Host "  -> Fuentes JetBrainsMono Nerd Font ya están instaladas. Omitiendo." -ForegroundColor Green
+    Write-Host "  -> Instalación de fuentes omitida (-SkipFonts)." -ForegroundColor DarkGray
 }
 
-# --- PASO 3: Configurar el perfil de PowerShell 7 ---
-Write-Host "[Paso 3/4] Configurando el perfil de PowerShell 7..." -ForegroundColor Cyan
-$profileUrl = "$repoUrl/profile.ps1"
+# --- PASO 3: Configurar el perfil de PowerShell ---
+if (-not $SkipProfile) {
+    Write-Host "[Paso 3/4] Configurando el perfil de PowerShell..." -ForegroundColor Cyan
+    $profileUrl = "$repoUrl/profile.ps1"
+    $profileDir = Split-Path -Path $PROFILE -Parent
 
-# --- CORRECCIÓN: Asegurar que el directorio del perfil exista ---
-$profileDir = Split-Path -Path $PROFILE -Parent
-if (-not (Test-Path -Path $profileDir)) {
-    Write-Host "  -> Creando directorio para el perfil de PowerShell: $profileDir"
-    New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
+    if (-not (Test-Path -Path $profileDir)) {
+        Write-Host "  -> Creando directorio para el perfil de PowerShell: $profileDir"
+        New-Item -Path $profileDir -ItemType Directory -Force | Out-Null
+    }
+
+    Backup-ExistingFile -Path $PROFILE
+    if (Invoke-WebRequestWithRetry -Uri $profileUrl -OutFile $PROFILE) {
+        Write-Host "  -> Perfil de PowerShell configurado." -ForegroundColor Green
+    }
+} else {
+    Write-Host "[Paso 3/4] Configuración de perfil omitida (-SkipProfile)." -ForegroundColor DarkGray
 }
-
-if (Test-Path $PROFILE) { Move-Item -Path $PROFILE -Destination "$PROFILE.bak" -Force }
-Invoke-WebRequest -Uri $profileUrl -OutFile $PROFILE
-Write-Host "  -> Perfil de PowerShell 7 configurado." -ForegroundColor Green
 
 # --- PASO 4: Configurar Fastfetch y Windows Terminal ---
 Write-Host "[Paso 4/4] Configurando Fastfetch y Windows Terminal..." -ForegroundColor Cyan
-$configDir = Join-Path -Path $HOME -ChildPath ".config"
-$fastfetchDir = Join-Path -Path $configDir -ChildPath "fastfetch"
+$configDir     = Join-Path -Path $HOME -ChildPath ".config"
+$fastfetchDir  = Join-Path -Path $configDir -ChildPath "fastfetch"
 New-Item -Path $configDir -ItemType Directory -Force | Out-Null
 New-Item -Path $fastfetchDir -ItemType Directory -Force | Out-Null
-Invoke-WebRequest -Uri "$repoUrl/fastfetch/ascii.txt" -OutFile (Join-Path $fastfetchDir "ascii.txt")
-Invoke-WebRequest -Uri "$repoUrl/fastfetch/config.jsonc" -OutFile (Join-Path $fastfetchDir "config.jsonc")
-Write-Host "  -> Fastfetch configurado." -ForegroundColor Green
 
-$wtSettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
-$wtSettingsUrl = "$repoUrl/settings.json"
-if (Test-Path $wtSettingsPath) { Move-Item -Path $wtSettingsPath -Destination "$wtSettingsPath.bak" -Force }
-Invoke-WebRequest -Uri $wtSettingsUrl -OutFile $wtSettingsPath
-Write-Host "  -> Windows Terminal configurado." -ForegroundColor Green
+$ffOk1 = Invoke-WebRequestWithRetry -Uri "$repoUrl/fastfetch/ascii.txt" -OutFile (Join-Path $fastfetchDir "ascii.txt")
+$ffOk2 = Invoke-WebRequestWithRetry -Uri "$repoUrl/fastfetch/config.jsonc" -OutFile (Join-Path $fastfetchDir "config.jsonc")
+if ($ffOk1 -and $ffOk2) { Write-Host "  -> Fastfetch configurado." -ForegroundColor Green }
+
+if (-not $SkipTerminalSettings) {
+    $wtSettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
+    $wtSettingsUrl  = "$repoUrl/settings.json"
+    if (Test-Path $wtSettingsPath) {
+        Backup-ExistingFile -Path $wtSettingsPath
+    }
+    if (Invoke-WebRequestWithRetry -Uri $wtSettingsUrl -OutFile $wtSettingsPath) {
+        Write-Host "  -> Windows Terminal configurado." -ForegroundColor Green
+    }
+} else {
+    Write-Host "  -> Configuración de Windows Terminal omitida (-SkipTerminalSettings)." -ForegroundColor DarkGray
+}
 
 # --- FINALIZACIÓN ---
 Write-Host
